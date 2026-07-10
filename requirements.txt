@@ -8,4 +8,6 @@
 sports2d==0.8.32
 dash==4.4.0
 pandas==2.2.3
+numpy==2.4.6
+scipy==1.17.1
 InquirerPy==0.3.4

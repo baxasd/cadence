@@ -35,7 +35,8 @@ The two stages are deliberately separate:
 
 - Python 3.12
 - The dependencies in [`requirements.txt`](requirements.txt) — Sports2D pulls in a large
-  tree via Pose2Sim (torch, OpenCV, etc.), so the first install is sizeable.
+  tree via Pose2Sim (torch, OpenCV, etc.), so the first install is sizeable. The viewer's
+  analytics add `numpy` and `scipy` as direct pins (both already in the Sports2D tree).
 
 ## Setup
 
@@ -75,16 +76,56 @@ to the terminal while it runs.
 python app.py
 ```
 
-Open <http://127.0.0.1:8050>, upload a Sports2D angles `.mot` file (from
-`data/results/<video-name>/…`), and browse one interactive plot per joint angle.
-**Clear workspace** in the sidebar returns to the upload screen.
+Open <http://127.0.0.1:8050>, drop a Sports2D angles `.mot` file (from
+`data/results/<video-name>/…`) onto the upload screen, and the **Gait Analysis**
+page renders. **Clear workspace** in the pinned sidebar returns to the upload screen.
+
+The page has four parts, top to bottom:
+
+1. **Metadata cards** — one row of tiles derived from the file: `File`, `Frames`,
+   `Duration`, `Sample rate`, `Angles`, `Units`, plus two computed analytics,
+   `Cadence` and `Strides` (see below).
+2. **Data table** — the raw table, sortable and paginated. Values display at 2 dp
+   but the built-in **Export → CSV** downloads them at full precision; the stored
+   data is never mutated.
+3. **Angle plots** — one plot per body part, two per row, grouped into *Joints* and
+   *Segments*. Left and Right of a joint share axes in distinct colours (Left =
+   vermilion, Right = pine) so asymmetry reads at a glance; axial parts (pelvis,
+   trunk, head, shoulders) draw a single graphite trace. Each plot has the Plotly
+   mode bar for PNG download / zoom / pan.
+4. **Gait cycle — mean ± SD** — the same angles collapsed into one representative
+   stride (see below).
+
+#### Analysis features
+
+All analytics are computed on the fly from the single uploaded file — no training,
+no stored model, just classical signal processing:
+
+- **Cadence** (`~168 spm`) — estimated by **autocorrelation** of a cyclic joint
+  (knee/ankle): the signal is correlated with itself, the first alignment peak
+  within a 0.4–1.5 s window is the stride period, and cadence = `120 / stride_period`
+  (one stride = two steps). A single average for the clip; shown with `~` to mark it
+  an estimate.
+- **Strides** — stride boundaries found with `scipy.signal.find_peaks` on the same
+  joint (peaks ≥ 0.4 s apart, above a prominence floor so noise can't invent
+  strides). The card reports complete strides (peaks − 1).
+- **Gait cycle (mean ± SD)** — each stride between consecutive peaks is resampled
+  onto a shared 0–100 % axis and averaged, with a ±1 SD band showing stride-to-stride
+  variability. Right-side angles are normalised over the right knee/ankle cycle and
+  left over the left, so Left and Right are phase-aligned and directly comparable.
+  Dozens of noisy strides become one clean curve; a wide band means inconsistent
+  striding.
+
+These need a strong cyclic joint (knee or ankle) in the file. If none is present, or
+the clip is too short to find a period, the affected cards and the gait-cycle section
+are simply omitted rather than showing a misleading value.
 
 ## Project layout
 
 ```
 main.py            Processing: interactive menu (Run / Settings / Exit)
-app.py             Dash viewer: upload a .mot → plots. No processing.
-assets/            CSS for the viewer (Dash auto-serves this folder)
+app.py             Dash viewer: upload a .mot → metadata, table, plots, gait-cycle analytics
+assets/cadence.css Viewer styling ("Tartan Track" theme; Dash auto-serves assets/)
 requirements.txt   Pinned direct dependencies
 settings.json      Saved CLI settings, remembered across restarts (gitignored)
 data/              Uploaded videos and Sports2D output (gitignored)

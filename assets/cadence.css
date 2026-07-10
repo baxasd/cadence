@@ -1,25 +1,42 @@
-/* Cadence viewer — light research theme.
-   Chart colours live in the Plotly template in app.py; the pink brand accent
-   (matching main.py's banner) lives here. Dash auto-serves this assets/ folder. */
+/* Cadence viewer — "Tartan Track" identity.
+   A quiet, warm research surface where the angle trace is the hero; the one
+   note of colour is an athletic vermilion — the colour of a running track.
+   Chart colours live in the Plotly template in app.py and echo these tokens.
+   Dash auto-serves this assets/ folder. */
 
 :root {
-  --page:      #f9f9f7;   /* page plane            */
-  --surface:   #fcfcfb;   /* cards + chart surface */
-  --ink:       #0b0b0b;   /* primary text          */
-  --secondary: #52514e;
-  --muted:     #898781;   /* labels / axis         */
-  --border:    rgba(11, 11, 11, 0.10);
-  --accent:    #ff6fb3;   /* brand pink (main.py banner) */
+  --page:      #f7f5f0;   /* chalk — page plane            */
+  --surface:   #fcfbf8;   /* bone — cards + chart surface  */
+  --ink:       #14130f;   /* graphite — primary text       */
+  --secondary: #454339;   /* body-secondary                */
+  --muted:     #6f6d66;   /* ash — labels / axes           */
+  --border:    rgba(20, 19, 15, 0.10);
+  --accent:    #d24e2b;   /* track vermilion               */
+  --accent-ink:#a83c1e;   /* accent, darkened for text-on-light */
+  --accent-wash: rgba(210, 78, 43, 0.08);
+  --error:     #b23a22;
+
+  --font-body: inter, system-ui, -apple-system;
+  --font-mono: ui-monospace, Consolas, monospace;
 }
+
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
   background: var(--page);
   color: var(--ink);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Data reads as data: numbers everywhere use the mono face. */
+.mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
+
+/* Visible keyboard focus, in-brand. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* `hidden` must win over the display:flex on .landing/.workspace below. */
 [hidden] { display: none !important; }
@@ -28,66 +45,99 @@ body {
 .landing {
   min-height: 100vh;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 14px; padding: 24px; text-align: center;
+  gap: 12px; padding: 24px; text-align: center;
 }
 .brand-title {
-  margin: 0; font-size: 40px; font-weight: 700;
-  letter-spacing: -0.02em; color: var(--accent);
+  margin: 0; font-size: 48px; font-weight: 650;
+  letter-spacing: -0.03em; color: var(--ink);
+  text-transform: uppercase;
 }
-.tagline { margin: 0; color: var(--secondary); }
+/* Signature: the stride-cadence tick — a short vermilion rule that stands in
+   for a single gait cycle beneath the wordmark. */
+.brand-title::after {
+  content: ""; display: block;
+  width: 56px; height: 4px; margin: 14px auto 0;
+  background: var(--accent); border-radius: 2px;
+}
+.tagline { margin: 0; color: var(--secondary); letter-spacing: 0.01em; }
 .uploader {
-  margin-top: 12px; width: min(420px, 80vw); padding: 32px 24px;
-  border: 1.5px dashed var(--border); border-radius: 12px;
+  margin-top: 16px; width: min(440px, 82vw); padding: 34px 24px;
+  border: 1.5px dashed var(--border); border-radius: 14px;
   background: var(--surface); cursor: pointer;
-  transition: border-color 0.12s ease;
+  transition: border-color 0.14s ease, background 0.14s ease;
 }
-.uploader:hover { border-color: var(--accent); }
-.uploader .link { color: var(--accent); }
+.uploader:hover { border-color: var(--accent); background: var(--accent-wash); }
+.uploader .link { color: var(--accent-ink); font-weight: 600; }
 .uploader-hint { margin-top: 6px; font-size: 12px; color: var(--muted); }
 
 /* --- workspace (sidebar + main) ---------------------------------------- */
 .workspace { display: flex; min-height: 100vh; }
 .sidebar {
-  flex: 0 0 240px; padding: 24px;
+  flex: 0 0 248px; padding: 24px;
   border-right: 1px solid var(--border); background: var(--surface);
-  display: flex; flex-direction: column; gap: 12px;
+  display: flex; flex-direction: column; gap: 14px;
+  /* Pinned: stays in place while the main pane scrolls. */
+  position: sticky; top: 0; align-self: flex-start; height: 100vh;
 }
-.side-title { font-size: 20px; font-weight: 700; color: var(--accent); }
-.side-file { font-size: 12px; color: var(--muted); word-break: break-word; }
+.side-title {
+  font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+  text-transform: uppercase; color: var(--ink);
+}
 .btn {
-  margin-top: auto; padding: 8px 14px; font-size: 13px; cursor: pointer;
-  background: var(--page); color: var(--ink);
+  margin-top: auto; padding: 9px 14px; font-size: 13px; font-weight: 500;
+  cursor: pointer; background: var(--page); color: var(--ink);
   border: 1px solid var(--border); border-radius: 8px;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
-.btn:hover { border-color: var(--accent); color: var(--accent); }
-.main { flex: 1; min-width: 0; padding: 24px; }
+.btn:hover { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-wash); }
+.main { flex: 1; min-width: 0; padding: 28px 32px; }
 
-/* --- provenance stat tiles --------------------------------------------- */
-.stat-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px; margin-bottom: 24px;
+/* --- page header -------------------------------------------------------- */
+.page-title {
+  margin: 0 0 24px; font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+  padding-bottom: 16px; border-bottom: 1px solid var(--border);
 }
-.stat-card {
+
+/* --- metadata cards ----------------------------------------------------- */
+.meta-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px; margin-bottom: 30px;
+}
+.meta-card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 14px;
+  border-radius: 10px; padding: 13px 15px; min-width: 0;
 }
-.stat-label {
-  font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 4px;
+.meta-label {
+  font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 5px;
 }
-.stat-value { font-size: 18px; font-weight: 600; word-break: break-word; }
+.meta-value { font-size: 16px; font-weight: 600; }
+.meta-file { font-size: 13px; word-break: break-all; }
+
+/* --- data table --------------------------------------------------------- */
+.table-card { margin-bottom: 34px; }
 
 /* --- plot grid ---------------------------------------------------------- */
+.section-label {
+  font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); margin: 2px 0 16px;
+}
+/* Two plots per row; collapse to one when the pane gets too narrow. */
 .plot-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
-  gap: 16px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px; margin-bottom: 34px;
+}
+.plot-grid:last-child { margin-bottom: 0; }
+@media (max-width: 760px) {
+  .plot-grid { grid-template-columns: 1fr; }
 }
 .plot-card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 8px;
+  border-radius: 10px; padding: 10px 12px;
 }
-.section-label {
-  font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--muted); margin: 4px 0 12px;
+
+.error { color: var(--error); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
 }
-.error { color: #d03b3b; }
