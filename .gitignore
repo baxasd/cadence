@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Working data: uploaded videos and Sports2D output
+data/
+
+# Operator-local saved CLI settings
+settings.json
+
+# Runtime logs (e.g. OpenSim's opensim.log)
+*.log

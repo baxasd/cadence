@@ -1,0 +1,11 @@
+# Cadence — pinned dependencies (Python 3.12)
+#
+# These are our DIRECT dependencies, pinned to exact versions verified on PyPI
+# at scaffold time (2026-07-07). sports2d pulls in a large transitive tree
+# (Pose2Sim -> torch, opencv, etc.). After the first `pip install -r requirements.txt`,
+# run `pip freeze > requirements.lock.txt` to capture the full, reproducible lock.
+
+sports2d==0.8.32
+dash==4.4.0
+pandas==2.2.3
+InquirerPy==0.3.4

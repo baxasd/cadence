@@ -1,0 +1,93 @@
+/* Cadence viewer — light research theme.
+   Chart colours live in the Plotly template in app.py; the pink brand accent
+   (matching main.py's banner) lives here. Dash auto-serves this assets/ folder. */
+
+:root {
+  --page:      #f9f9f7;   /* page plane            */
+  --surface:   #fcfcfb;   /* cards + chart surface */
+  --ink:       #0b0b0b;   /* primary text          */
+  --secondary: #52514e;
+  --muted:     #898781;   /* labels / axis         */
+  --border:    rgba(11, 11, 11, 0.10);
+  --accent:    #ff6fb3;   /* brand pink (main.py banner) */
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* `hidden` must win over the display:flex on .landing/.workspace below. */
+[hidden] { display: none !important; }
+
+/* --- landing (empty state) --------------------------------------------- */
+.landing {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 24px; text-align: center;
+}
+.brand-title {
+  margin: 0; font-size: 40px; font-weight: 700;
+  letter-spacing: -0.02em; color: var(--accent);
+}
+.tagline { margin: 0; color: var(--secondary); }
+.uploader {
+  margin-top: 12px; width: min(420px, 80vw); padding: 32px 24px;
+  border: 1.5px dashed var(--border); border-radius: 12px;
+  background: var(--surface); cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.uploader:hover { border-color: var(--accent); }
+.uploader .link { color: var(--accent); }
+.uploader-hint { margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+/* --- workspace (sidebar + main) ---------------------------------------- */
+.workspace { display: flex; min-height: 100vh; }
+.sidebar {
+  flex: 0 0 240px; padding: 24px;
+  border-right: 1px solid var(--border); background: var(--surface);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.side-title { font-size: 20px; font-weight: 700; color: var(--accent); }
+.side-file { font-size: 12px; color: var(--muted); word-break: break-word; }
+.btn {
+  margin-top: auto; padding: 8px 14px; font-size: 13px; cursor: pointer;
+  background: var(--page); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.main { flex: 1; min-width: 0; padding: 24px; }
+
+/* --- provenance stat tiles --------------------------------------------- */
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+}
+.stat-label {
+  font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 4px;
+}
+.stat-value { font-size: 18px; font-weight: 600; word-break: break-word; }
+
+/* --- plot grid ---------------------------------------------------------- */
+.plot-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  gap: 16px;
+}
+.plot-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px;
+}
+.section-label {
+  font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--muted); margin: 4px 0 12px;
+}
+.error { color: #d03b3b; }
