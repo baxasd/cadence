@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 175" width="200" height="175" role="img" aria-label="Knee flexion: the angle at the knee between the thigh vector and the shank vector." xmlns:bx="https://boxy-svg.com"><defs><bx:export><bx:file format="svg"/></bx:export></defs><style>
+    svg { --ink:#14130f; --muted:#6f6d66; --axial:#454339; --left:#d24e2b; --surface:#fcfbf8; }
+    @media (prefers-color-scheme: dark) {
+      svg { --ink:#f2efe8; --muted:#928e83; --axial:#a9a496; --left:#e8623d; --surface:#1c1b16; }
+    }
+    .t { font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
+  </style><line x1="70" y1="22" x2="96" y2="86" stroke="var(--axial)" stroke-width="2.5" stroke-linecap="round"/><line x1="96" y1="86" x2="72" y2="150" stroke="var(--axial)" stroke-width="2.5" stroke-linecap="round"/><path d="M 96 86 L 122 150" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" stroke-linecap="round"/><path d="M 108 116 Q 100 122 88 118" fill="none" stroke="var(--left)" stroke-width="2"/><circle cx="70" cy="22" r="5" fill="var(--surface)" stroke="var(--axial)" stroke-width="2.5"/><circle cx="96" cy="86" r="6" fill="var(--left)"/><circle cx="72" cy="150" r="5" fill="var(--surface)" stroke="var(--axial)" stroke-width="2.5"/><text class="t" style="white-space: pre;" x="80" y="18">Hip</text><text class="t" style="fill: rgb(232, 98, 61); white-space: pre;" x="108" y="84">Knee</text><text class="t" style="white-space: pre;" x="22" y="154">Ankle</text><text class="t" x="120" y="110" fill="var(--left)" style="white-space: pre;">θ</text><text class="t" style="white-space: pre;" x="98.605" y="163.684">thigh extended</text></svg>
