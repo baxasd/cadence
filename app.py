@@ -16,11 +16,11 @@ import io
 
 import numpy as np
 import pandas as pd
-from scipy.signal import find_peaks
 import plotly.graph_objects as go
 import plotly.io as pio
 from dash import Dash, Input, Output, State, dash_table, dcc, html
 from dash.dash_table.Format import Format, Scheme
+from dash.exceptions import PreventUpdate
 
 APP_NAME = "Cadence"
 TAGLINE = "University of Roehampton - powered by Sports2D"
@@ -95,96 +95,78 @@ def mot_provenance(df: pd.DataFrame, filename: str) -> list[tuple[str, str]]:
 # Prefer a strongly cyclic joint; each swings through a full arc once per stride.
 CADENCE_SIGNALS = ("right knee", "left knee", "right ankle", "left ankle")
 
+# Cadence-over-time sliding window: how much run each point averages, and how far
+# the window hops between points. Defaults for both the function and the UI knobs.
+CADENCE_WINDOW_S = 4.0
+CADENCE_STEP_S = 1.0
 
-def cadence(df: pd.DataFrame) -> int | None:
-    """Estimate running cadence (steps/min) from a cyclic joint by autocorrelation.
 
-    A single knee's angle repeats once per gait cycle (one stride = two steps),
-    so cadence = 120 / stride_period. Returns None when there's no suitable
-    signal or no clear period. Nothing is trained — the signal is just
-    correlated with itself, and the first peak's lag is the stride period.
+def _stride_period(y: np.ndarray, dt: float) -> float | None:
+    """Stride period (s) of a cyclic signal by autocorrelation, or None.
+
+    The de-meaned signal is correlated with itself; the first peak in the
+    0.4–1.5 s lag window is the stride period. That peak's lag is refined by a
+    parabolic fit to its two neighbours, so the period is sub-frame accurate
+    rather than capped at one-frame steps. Nothing is trained.
     """
-    signal_col = next((c for c in CADENCE_SIGNALS if c in df.columns), None)
-    if signal_col is None or TIME_COL not in df.columns or len(df) < 20:
+    if len(y) < 20:
         return None
-    dt = df[TIME_COL].diff().median()
-    if not dt or dt <= 0:
-        return None
-    y = df[signal_col].to_numpy(dtype=float)
     y = np.nan_to_num(y - np.nanmean(y))
     autocorr = np.correlate(y, y, mode="full")[len(y) - 1:]
     lo, hi = max(int(round(0.4 / dt)), 1), min(int(round(1.5 / dt)), len(autocorr) - 1)
     if hi <= lo:
         return None
-    stride_period = (lo + int(np.argmax(autocorr[lo:hi]))) * dt   # plausible stride 0.4–1.5 s
-    return round(120.0 / stride_period)
+    k = lo + int(np.argmax(autocorr[lo:hi]))
+    # Parabolic interpolation on the three points around the peak recovers a
+    # sub-frame lag: offset in (-0.5, 0.5) samples from the integer peak k.
+    a, b, c = autocorr[k - 1], autocorr[k], autocorr[k + 1]
+    denom = a - 2 * b + c
+    offset = 0.5 * (a - c) / denom if denom else 0.0
+    return (k + offset) * dt
 
 
-def stride_peaks(df: pd.DataFrame) -> tuple[str | None, np.ndarray]:
-    """Find gait-cycle boundaries in a cyclic joint via peak detection.
-
-    Each stride makes one clear peak of knee flexion, so the peaks split the
-    signal into strides (N peaks -> N-1 full strides). ``distance`` keeps peaks
-    at least 0.4 s apart and ``prominence`` ignores small wiggles, so noise
-    doesn't invent strides. Returns (signal column, peak indices).
-    """
+def _cadence_signal(df: pd.DataFrame) -> tuple[str | None, float | None]:
+    """Pick a cyclic joint column and the median frame interval, or (None, None)."""
     signal_col = next((c for c in CADENCE_SIGNALS if c in df.columns), None)
-    if signal_col is None or TIME_COL not in df.columns or len(df) < 20:
-        return None, np.array([], dtype=int)
+    if signal_col is None or TIME_COL not in df.columns:
+        return None, None
     dt = df[TIME_COL].diff().median()
-    if not dt or dt <= 0:
-        return None, np.array([], dtype=int)
-    y = np.nan_to_num(df[signal_col].to_numpy(dtype=float))
-    min_distance = max(int(round(0.4 / dt)), 1)
-    peaks, _ = find_peaks(y, distance=min_distance, prominence=0.3 * np.nanstd(y))
-    return signal_col, peaks
+    return (signal_col, dt) if dt and dt > 0 else (None, None)
 
 
-# Gait-cycle normalisation: every stride is stretched onto a shared 0-100% axis
-# so strides of unequal length can be averaged into one representative cycle.
-CYCLE_POINTS = 101
-
-
-def _peaks_for(df: pd.DataFrame, col: str) -> np.ndarray:
-    """Stride-boundary peaks for one column (same rule as ``stride_peaks``)."""
-    dt = df[TIME_COL].diff().median()
-    if not dt or dt <= 0:
-        return np.array([], dtype=int)
-    y = np.nan_to_num(df[col].to_numpy(dtype=float))
-    peaks, _ = find_peaks(y, distance=max(int(round(0.4 / dt)), 1),
-                          prominence=0.3 * np.nanstd(y))
-    return peaks
-
-
-def reference_peaks(df: pd.DataFrame) -> tuple[dict[str, np.ndarray], np.ndarray]:
-    """Per-side stride boundaries. Right-side angles are normalised over the
-    right knee/ankle cycle, left-side over the left; axial angles fall back to
-    whichever side exists. Returns ({side: peaks}, default_peaks)."""
-    refs: dict[str, np.ndarray] = {}
-    for side in ("right", "left"):
-        col = next((f"{side} {j}" for j in ("knee", "ankle")
-                    if f"{side} {j}" in df.columns), None)
-        if col is not None:
-            refs[side] = _peaks_for(df, col)
-    default = refs.get("right", np.array([], dtype=int))
-    if len(default) < 2:
-        default = refs.get("left", np.array([], dtype=int))
-    return refs, default
-
-
-def cycle_mean_std(values: np.ndarray, peaks: np.ndarray):
-    """Resample each stride to 0-100% and return (mean, std) across strides, or
-    None when no usable stride exists."""
-    grid = np.linspace(0, 1, CYCLE_POINTS)
-    strides = []
-    for a, b in zip(peaks[:-1], peaks[1:]):
-        seg = values[a:b]
-        if len(seg) >= 3:
-            strides.append(np.interp(grid, np.linspace(0, 1, len(seg)), seg))
-    if not strides:
+def cadence(df: pd.DataFrame) -> int | None:
+    """Overall running cadence (steps/min) over the whole clip: one stride is
+    two steps, so cadence = 120 / stride_period. None if there's no clear period.
+    """
+    signal_col, dt = _cadence_signal(df)
+    if signal_col is None:
         return None
-    stacked = np.vstack(strides)
-    return stacked.mean(axis=0), stacked.std(axis=0)
+    period = _stride_period(df[signal_col].to_numpy(dtype=float), dt)
+    return round(120.0 / period) if period else None
+
+
+def cadence_series(df: pd.DataFrame, window_s: float = CADENCE_WINDOW_S,
+                   step_s: float = CADENCE_STEP_S) -> tuple[np.ndarray, np.ndarray]:
+    """Cadence in sliding windows across the run, as (times, steps/min).
+
+    Each window's stride period is estimated exactly as the overall number, so
+    the trace shows how cadence drifts over the run (e.g. with fatigue) without
+    a second, competing method. Windows with no clear period are dropped.
+    """
+    signal_col, dt = _cadence_signal(df)
+    if signal_col is None:
+        return np.array([]), np.array([])
+    y = df[signal_col].to_numpy(dtype=float)
+    t = df[TIME_COL].to_numpy(dtype=float)
+    win = int(round(window_s / dt))
+    step = max(int(round(step_s / dt)), 1)
+    times, spm = [], []
+    for start in range(0, len(y) - win + 1, step):
+        period = _stride_period(y[start:start + win], dt)
+        if period:
+            times.append(t[start + win // 2])
+            spm.append(120.0 / period)
+    return np.array(times), np.array(spm)
 
 
 # --- angle index -------------------------------------------------------------
@@ -325,60 +307,38 @@ def grid_view(df: pd.DataFrame, parts: list[dict]) -> list:
     return out
 
 
-def _rgba(hex_colour: str, alpha: float) -> str:
-    h = hex_colour.lstrip("#")
-    return f"rgba({int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)},{alpha})"
-
-
-def cycle_figure(df: pd.DataFrame, part: dict,
-                 refs: dict[str, np.ndarray], default: np.ndarray) -> go.Figure | None:
-    """Gait-cycle plot for one part: the mean stride (0-100%) with a ±SD band,
-    per side. Returns None if no side yields a usable cycle."""
-    grid = np.linspace(0, 100, CYCLE_POINTS)
-    band_x = np.concatenate([grid, grid[::-1]])
+def cadence_figure(times: np.ndarray, spm: np.ndarray) -> go.Figure:
+    """The cadence-over-time line for a computed (times, steps/min) series."""
     fig = go.Figure()
-    drew = False
-    for side, colour, name in (("left", LEFT_COLOUR, "Left"),
-                               ("right", RIGHT_COLOUR, "Right"),
-                               ("single", SINGLE_COLOUR, part["label"])):
-        if side not in part["cols"]:
-            continue
-        peaks = default if side == "single" else refs.get(side, default)
-        result = cycle_mean_std(df[part["cols"][side]].to_numpy(dtype=float), peaks)
-        if result is None:
-            continue
-        mean, std = result
-        fig.add_scatter(x=band_x, y=np.concatenate([mean + std, (mean - std)[::-1]]),
-                        fill="toself", fillcolor=_rgba(colour, 0.15), line=dict(width=0),
-                        hoverinfo="skip", showlegend=False)
-        fig.add_scatter(x=grid, y=mean, mode="lines", name=name,
-                        line=dict(color=colour, width=2))
-        drew = True
-    if not drew:
-        return None
+    fig.add_scatter(x=times, y=spm, mode="lines", name="Cadence",
+                    line=dict(color=SINGLE_COLOUR, width=2))
     fig.update_layout(
-        title=dict(text=part["label"], font=dict(size=14, color=INK), x=0, xanchor="left"),
-        height=300, showlegend="single" not in part["cols"],
-        legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1,
-                    font=dict(size=11)),
-    )
-    fig.update_xaxes(title_text="gait cycle (%)", nticks=6, automargin=True, range=[0, 100])
-    fig.update_yaxes(ticksuffix="°", nticks=5, automargin=True)
+        title=dict(text="Cadence", font=dict(size=14, color=INK), x=0, xanchor="left"),
+        height=300, showlegend=False)
+    fig.update_xaxes(title_text="time (s)", nticks=6, automargin=True)
+    fig.update_yaxes(title_text="steps/min", nticks=5, automargin=True)
     return fig
 
 
-def gait_cycle_view(df: pd.DataFrame, parts: list[dict]) -> list:
-    """A section of gait-cycle (mean ± SD) plots, one per part that has strides.
-    Empty when there's no cyclic reference to segment on."""
-    refs, default = reference_peaks(df)
-    if len(default) < 2:
+def _cadence_knob(label: str, control_id: str, value: float, minimum: float) -> html.Div:
+    """A labelled numeric input for one sliding-window setting."""
+    return html.Div(className="cadence-knob", children=[
+        html.Label(label, htmlFor=control_id),
+        dcc.Input(id=control_id, type="number", value=value, min=minimum, step=0.5,
+                  debounce=True),
+    ])
+
+
+def cadence_view(df: pd.DataFrame, window_s: float, step_s: float) -> list:
+    """A cadence-over-time line, so a drift (e.g. with fatigue) is visible.
+    The window/step knobs live in the sidebar. Empty when there's no series."""
+    times, spm = cadence_series(df, window_s, step_s)
+    if len(times) < 2:
         return []
-    cards = [_plot_card(fig) for p in parts
-             if (fig := cycle_figure(df, p, refs, default)) is not None]
-    if not cards:
-        return []
-    return [html.Div("Gait cycle — mean ± SD", className="section-label"),
-            html.Div(cards, className="plot-grid")]
+    graph = dcc.Graph(id="cadence-graph", figure=cadence_figure(times, spm),
+                      config=PLOT_CONFIG, style={"width": "100%"})
+    return [html.Div("Cadence over time", className="section-label"),
+            html.Div([html.Div(graph, className="plot-card")], className="plot-grid")]
 
 
 # --- Dash app ----------------------------------------------------------------
@@ -386,8 +346,11 @@ def gait_cycle_view(df: pd.DataFrame, parts: list[dict]) -> list:
 # shown. The sidebar is the fixed shell (brand + Clear, room for future page
 # nav); the main pane is the Gait Analysis page: header, meta, table, plots.
 
-app = Dash(__name__, title=APP_NAME)
+# suppress_callback_exceptions: the cadence knobs and graph are created inside
+# the load callback, so they aren't in the initial layout Dash validates against.
+app = Dash(__name__, title=APP_NAME, suppress_callback_exceptions=True)
 app.layout = html.Div([
+    dcc.Store(id="cadence-store"),
     html.Div(id="landing", className="landing", children=[
         html.H1(APP_NAME, className="brand-title"),
         html.P(TAGLINE, className="tagline"),
@@ -400,6 +363,11 @@ app.layout = html.Div([
     html.Div(id="workspace", className="workspace", hidden=True, children=[
         html.Div(className="sidebar", children=[
             html.Div(APP_NAME, className="side-title"),
+            html.Div(className="side-controls", children=[
+                html.Div("Cadence window", className="side-label"),
+                _cadence_knob("Window (s)", "cadence-window", CADENCE_WINDOW_S, 1.0),
+                _cadence_knob("Step (s)", "cadence-step", CADENCE_STEP_S, 0.5),
+            ]),
             html.Button("Clear workspace", id="clear-btn", className="btn"),
         ]),
         html.Div(className="main", children=[
@@ -414,14 +382,21 @@ app.layout = html.Div([
     Output("landing", "hidden"),
     Output("workspace", "hidden"),
     Output("content", "children"),
+    Output("cadence-store", "data"),
     Input("upload", "contents"),
     State("upload", "filename"),
+    State("cadence-window", "value"),
+    State("cadence-step", "value"),
     prevent_initial_call=True,
 )
-def load(contents: str | None, filename: str | None):
+def load(contents: str | None, filename: str | None,
+         window_s: float | None, step_s: float | None):
     """A file opens the workspace; no file (after Clear) returns to landing."""
     if not contents:
-        return False, True, None
+        return False, True, None, None
+    window_s = window_s or CADENCE_WINDOW_S   # knobs may be blank on first load
+    step_s = step_s or CADENCE_STEP_S
+    store = None
     try:
         df = read_mot(_decode(contents))
         parts = angle_index(df)
@@ -431,16 +406,33 @@ def load(contents: str | None, filename: str | None):
         spm = cadence(df)
         if spm:
             facts.append(("Cadence", f"~{spm} spm"))
-        _, peaks = stride_peaks(df)
-        if len(peaks) >= 2:
-            facts.append(("Strides", str(len(peaks) - 1)))
+        signal_col, _ = _cadence_signal(df)
+        if signal_col:  # keep the cadence signal so the knobs can recompute live
+            store = {"time": df[TIME_COL].tolist(), "col": signal_col,
+                     "vals": df[signal_col].tolist()}
         body = [meta_cards(facts),
                 data_table(df),
-                *grid_view(df, parts),
-                *gait_cycle_view(df, parts)]
+                *cadence_view(df, window_s, step_s),
+                *grid_view(df, parts)]
     except Exception as err:  # a bad upload should report, not crash the app
         body = [html.P(f"Couldn't read {filename}: {err}", className="error")]
-    return True, False, body
+    return True, False, body, store
+
+
+@app.callback(
+    Output("cadence-graph", "figure"),
+    Input("cadence-window", "value"),
+    Input("cadence-step", "value"),
+    State("cadence-store", "data"),
+    prevent_initial_call=True,
+)
+def retune_cadence(window_s: float | None, step_s: float | None, store: dict | None):
+    """Recompute the cadence-over-time line when a window/step knob changes."""
+    if not store or not window_s or not step_s:
+        raise PreventUpdate
+    df = pd.DataFrame({TIME_COL: store["time"], store["col"]: store["vals"]})
+    times, spm = cadence_series(df, window_s, step_s)
+    return cadence_figure(times, spm)
 
 
 @app.callback(

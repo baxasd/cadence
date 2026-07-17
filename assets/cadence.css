@@ -136,6 +136,28 @@ body {
   border-radius: 10px; padding: 10px 12px;
 }
 
+/* --- cadence knobs (sidebar) -------------------------------------------- */
+/* Sliding-window settings for the cadence-over-time plot; live in the sidebar. */
+.side-controls {
+  display: flex; flex-direction: column; gap: 12px;
+  padding-top: 18px; border-top: 1px solid var(--border);
+}
+.side-label {
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted);
+}
+.cadence-knob { display: flex; flex-direction: column; gap: 5px; }
+.cadence-knob label {
+  font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--muted);
+}
+.cadence-knob input {
+  width: 84px; padding: 6px 10px;
+  font-family: var(--font-mono); font-size: 13px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+}
+.cadence-knob input:hover { border-color: var(--accent); }
+
 .error { color: var(--error); }
 
 @media (prefers-reduced-motion: reduce) {
