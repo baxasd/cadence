@@ -11,3 +11,5 @@ settings.json
 
 # Runtime logs (e.g. OpenSim's opensim.log)
 *.log
+
+*.mp4
